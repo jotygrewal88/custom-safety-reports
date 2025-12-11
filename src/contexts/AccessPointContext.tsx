@@ -1,0 +1,269 @@
+"use client";
+
+import React, { createContext, useContext, useState, ReactNode } from "react";
+
+export interface AccessPoint {
+  id: string;
+  name: string;
+  location: string;
+  asset?: string;
+  templateIds: string[]; // Array of 1-5 template IDs
+  createdBy: string;
+  createdAt: string;
+  status: 'active' | 'archived';
+  qrCodeUrl: string;
+}
+
+interface AccessPointContextValue {
+  accessPoints: AccessPoint[];
+  createAccessPoint: (name: string, location: string, asset: string | undefined, templateIds: string[]) => string;
+  getAccessPoint: (id: string) => AccessPoint | undefined;
+  getAllAccessPoints: () => AccessPoint[];
+  updateAccessPoint: (id: string, updates: Partial<AccessPoint>) => void;
+  archiveAccessPoint: (id: string) => void;
+}
+
+const AccessPointContext = createContext<AccessPointContextValue | undefined>(undefined);
+
+const STORAGE_KEY = "accessPoints";
+
+// Create default sample access points
+function createDefaultAccessPoints(): AccessPoint[] {
+  return [
+    {
+      id: "access-point-1",
+      name: "Line 30",
+      location: "Joty's Manufacturing Plant",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-15T14:53:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-1&location=Joty's%20Manufacturing%20Plant"
+    },
+    {
+      id: "access-point-2",
+      name: "Test Access Point 3",
+      location: "Joty's Manufacturing Plant",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-15T14:53:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-2&location=Joty's%20Manufacturing%20Plant"
+    },
+    {
+      id: "access-point-3",
+      name: "Floor 3",
+      location: "Willy Wonka's Chocolate Factory",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-17T09:00:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-3&location=Willy%20Wonka's%20Chocolate%20Factory"
+    },
+    {
+      id: "access-point-4",
+      name: "Manufacturing Plant 3",
+      location: "UpKeep HQ",
+      asset: undefined,
+      templateIds: ["near-miss"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-18T10:30:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=near-miss&accessPointId=access-point-4&location=UpKeep%20HQ"
+    },
+    {
+      id: "access-point-5",
+      name: "Manufacturing Plant 3",
+      location: "Willy Wonka's Chocolate Factory",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-25T08:45:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-5&location=Willy%20Wonka's%20Chocolate%20Factory"
+    },
+    {
+      id: "access-point-6",
+      name: "John Doe",
+      location: "Joty's Manufacturing Plant",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-25T11:20:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-6&location=Joty's%20Manufacturing%20Plant"
+    },
+    {
+      id: "access-point-7",
+      name: "Manufacturing Plant 3",
+      location: "Office Area",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-09-05T15:00:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-7&location=Office%20Area"
+    },
+    {
+      id: "access-point-8",
+      name: "Office Area 1",
+      location: "Office Area",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-09-09T13:30:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-8&location=Office%20Area"
+    },
+    {
+      id: "access-point-9",
+      name: "Shipping Yard",
+      location: "Loading Dock",
+      asset: "Forklift FLT-12",
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-09-16T09:15:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-9&location=Loading%20Dock&asset=Forklift%20FLT-12"
+    },
+    {
+      id: "access-point-10",
+      name: "Manufacturing Plant 5",
+      location: "Willy Wonka's Chocolate Factory",
+      asset: "Chocolate Mixer 2",
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-09-17T14:00:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-10&location=Willy%20Wonka's%20Chocolate%20Factory&asset=Chocolate%20Mixer%202"
+    }
+  ];
+}
+
+interface AccessPointProviderProps {
+  children: ReactNode;
+}
+
+export function AccessPointProvider({ children }: AccessPointProviderProps) {
+  const [accessPoints, setAccessPoints] = useState<AccessPoint[]>(() => {
+    // Load from localStorage on initial mount
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as AccessPoint[];
+          // If we have old data (not 10 items), reset to defaults
+          // Migrate old format (templateId) to new format (templateIds)
+          const migrated = parsed.map((ap: AccessPoint & { templateId?: string }) => {
+            if (ap.templateId && !ap.templateIds) {
+              return { ...ap, templateIds: [ap.templateId] };
+            }
+            return ap;
+          });
+          if (migrated.length !== 10 || !migrated[0].id.startsWith('access-point-')) {
+            const defaults = createDefaultAccessPoints();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+            return defaults;
+          }
+            return migrated;
+        } catch (e) {
+          console.error("Failed to parse stored access points:", e);
+        }
+      }
+    }
+    const defaults = createDefaultAccessPoints();
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+    }
+    return defaults;
+  });
+
+  const createAccessPoint = (
+    name: string,
+    location: string,
+    asset: string | undefined,
+    templateIds: string[]
+  ): string => {
+    const newId = `access-point-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    // Generate QR code URL - if multiple templates, include all templateIds
+    const templateIdsParam = templateIds.length === 1 
+      ? `templateId=${templateIds[0]}`
+      : `templateIds=${templateIds.join(',')}`;
+    const qrCodeUrl = `/safety-events/template-form?${templateIdsParam}&accessPointId=${newId}&location=${encodeURIComponent(location)}${asset ? `&asset=${encodeURIComponent(asset)}` : ''}`;
+    
+    const newAccessPoint: AccessPoint = {
+      id: newId,
+      name: name,
+      location: location,
+      asset: asset,
+      templateIds: templateIds,
+      createdBy: "Joty Grewal", // Placeholder
+      createdAt: now,
+      status: 'active',
+      qrCodeUrl: qrCodeUrl
+    };
+
+    const updatedAccessPoints = [...accessPoints, newAccessPoint];
+    setAccessPoints(updatedAccessPoints);
+    
+    // Save immediately to localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAccessPoints));
+    }
+    
+    return newId;
+  };
+
+  const getAccessPoint = (id: string): AccessPoint | undefined => {
+    return accessPoints.find(ap => ap.id === id);
+  };
+
+  const getAllAccessPoints = (): AccessPoint[] => {
+    return accessPoints;
+  };
+
+  const updateAccessPoint = (id: string, updates: Partial<AccessPoint>): void => {
+    const updatedAccessPoints = accessPoints.map(ap =>
+      ap.id === id ? { ...ap, ...updates, id: ap.id } : ap
+    );
+    
+    setAccessPoints(updatedAccessPoints);
+    
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAccessPoints));
+    }
+  };
+
+  const archiveAccessPoint = (id: string): void => {
+    updateAccessPoint(id, { status: 'archived' });
+  };
+
+  return (
+    <AccessPointContext.Provider
+      value={{
+        accessPoints,
+        createAccessPoint,
+        getAccessPoint,
+        getAllAccessPoints,
+        updateAccessPoint,
+        archiveAccessPoint
+      }}
+    >
+      {children}
+    </AccessPointContext.Provider>
+  );
+}
+
+export function useAccessPoint() {
+  const context = useContext(AccessPointContext);
+  if (context === undefined) {
+    throw new Error("useAccessPoint must be used within an AccessPointProvider");
+  }
+  return context;
+}
+

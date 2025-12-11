@@ -1,0 +1,145 @@
+<svg width="300" height="600" viewBox="0 0 300 600" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="300" height="600" fill="#f3f4f6" />
+  
+  <!-- Body Outline - Front View - Complete anatomical silhouette -->
+  <!-- Using multiple paths that form one cohesive body outline -->
+  
+  <!-- Head -->
+  <ellipse cx="150" cy="45" rx="35" ry="40" fill="#e5e7eb" stroke="#000000" stroke-width="3" />
+  
+  <!-- Neck -->
+  <rect x="135" y="85" width="30" height="25" fill="#e5e7eb" stroke="#000000" stroke-width="3" rx="5" />
+  
+  <!-- Left arm (extends outward) -->
+  <path
+    d="M 100 110
+       Q 85 115, 70 130
+       Q 55 150, 50 180
+       Q 48 210, 50 240
+       Q 52 270, 56 300
+       Q 60 320, 65 335
+       Q 68 340, 70 342
+       Q 72 344, 74 344
+       Q 76 344, 78 342
+       Q 80 340, 78 335
+       Q 76 330, 73 315
+       Q 70 285, 68 240
+       Q 66 210, 70 180
+       Q 75 150, 85 130
+       Q 90 120, 95 115
+       Z"
+    fill="#e5e7eb"
+    stroke="#000000"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Right arm (extends outward) -->
+  <path
+    d="M 200 110
+       Q 215 115, 230 130
+       Q 245 150, 250 180
+       Q 252 210, 250 240
+       Q 248 270, 244 300
+       Q 240 320, 235 335
+       Q 232 340, 230 342
+       Q 228 344, 226 344
+       Q 224 344, 222 342
+       Q 220 340, 222 335
+       Q 224 330, 227 315
+       Q 230 285, 232 240
+       Q 234 210, 230 180
+       Q 225 150, 215 130
+       Q 210 120, 205 115
+       Z"
+    fill="#e5e7eb"
+    stroke="#000000"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Torso (main body) -->
+  <path
+    d="M 100 110
+       Q 105 125, 110 140
+       Q 115 160, 118 200
+       Q 120 240, 118 280
+       Q 116 320, 112 360
+       Q 108 400, 105 440
+       Q 102 480, 100 520
+       Q 98 560, 100 580
+       Q 102 590, 105 592
+       Q 108 592, 110 590
+       Q 112 585, 115 570
+       Q 118 540, 122 500
+       Q 125 460, 128 420
+       Q 132 380, 136 340
+       Q 140 300, 142 260
+       Q 144 220, 142 180
+       Q 140 160, 138 140
+       Q 135 125, 130 110
+       Z
+       M 200 110
+       Q 195 125, 190 140
+       Q 185 160, 182 200
+       Q 180 240, 182 280
+       Q 184 320, 188 360
+       Q 192 400, 195 440
+       Q 198 480, 200 520
+       Q 202 560, 200 580
+       Q 198 590, 195 592
+       Q 192 592, 190 590
+       Q 188 585, 185 570
+       Q 182 540, 178 500
+       Q 175 460, 172 420
+       Q 168 380, 164 340
+       Q 160 300, 158 260
+       Q 156 220, 158 180
+       Q 160 160, 162 140
+       Q 165 125, 170 110
+       Z"
+    fill="#e5e7eb"
+    stroke="#000000"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Left leg -->
+  <path
+    d="M 110 520
+       Q 108 540, 105 560
+       Q 102 580, 100 590
+       Q 98 595, 100 598
+       Q 102 600, 105 600
+       Q 108 600, 110 598
+       Q 112 595, 115 580
+       Q 118 560, 122 540
+       Z"
+    fill="#e5e7eb"
+    stroke="#000000"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Right leg -->
+  <path
+    d="M 190 520
+       Q 192 540, 195 560
+       Q 198 580, 200 590
+       Q 202 595, 200 598
+       Q 198 600, 195 600
+       Q 192 600, 190 598
+       Q 188 595, 185 580
+       Q 182 560, 178 540
+       Z"
+    fill="#e5e7eb"
+    stroke="#000000"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
