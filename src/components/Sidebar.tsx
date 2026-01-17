@@ -178,6 +178,26 @@ export default function Sidebar() {
                     >
                       <span>Safety Templates</span>
                     </Link>
+                    <Link
+                      href="/settings/custom-roles"
+                      className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-md ${
+                        pathname === "/settings/custom-roles"
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <span>Custom Roles</span>
+                    </Link>
+                    <Link
+                      href="/settings/people"
+                      className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-md ${
+                        pathname === "/settings/people"
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <span>People</span>
+                    </Link>
                   </div>
                 )}
               </>
