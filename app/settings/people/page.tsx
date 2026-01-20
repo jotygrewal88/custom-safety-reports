@@ -16,22 +16,27 @@ import React, { useState } from "react";
 import Sidebar from "../../../src/components/Sidebar";
 import CreateUserModal from "../../../src/components/CreateUserModal";
 import CreateRoleModal from "../../../src/components/CreateRoleModal";
+import CreateTeamModal from "../../../src/components/CreateTeamModal";
 import RoleBuilderMatrix from "../../../src/components/RoleBuilderMatrix";
 import { RoleProvider, useRole } from "../../../src/contexts/RoleContext";
 import { UserProvider, useUser } from "../../../src/contexts/UserContext";
+import { TeamProvider, useTeam } from "../../../src/contexts/TeamContext";
 import { mockLocationHierarchy } from "../../../src/samples/locationHierarchy";
 import { buildLocationPath } from "../../../src/schemas/locations";
 import { countEnabledPermissions, createDefaultPermissions } from "../../../src/schemas/roles";
 import type { CreateUserFormData } from "../../../src/schemas/users";
 import type { RolePermissions } from "../../../src/schemas/roles";
+import type { CreateTeamFormData } from "../../../src/schemas/teams";
+import { formatTeamType, formatPrimaryFunction, getTeamMemberCount } from "../../../src/schemas/teams";
 
-type TabType = 'users' | 'roles';
+type TabType = 'users' | 'roles' | 'teams';
 type RoleViewMode = 'list' | 'create' | 'edit';
 type RoleCreationMode = 'modal' | 'fullscreen';
 
 function PeopleContent() {
   const { getUsersList, createUser, updateUser, toggleUserStatus, checkDuplicateEmail } = useUser();
   const { getRolesList, getRoleById, createRole, updateRole, duplicateRole, deleteRole, checkDuplicateName } = useRole();
+  const { getTeamsList, getTeamById, createTeam, updateTeam, duplicateTeam, deleteTeam, toggleTeamStatus, checkDuplicateName: checkDuplicateTeamName } = useTeam();
   
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('users');
@@ -76,8 +81,18 @@ function PeopleContent() {
   const [fullscreenErrors, setFullscreenErrors] = useState<{name?: string; permissions?: string}>({});
   const [baseRoleId, setBaseRoleId] = useState<string>("");
 
+  // Teams tab state
+  const [teamSearchQuery, setTeamSearchQuery] = useState("");
+  const [teamTypeFilter, setTeamTypeFilter] = useState("all");
+  const [teamStatusFilter, setTeamStatusFilter] = useState("all");
+  const [teamLocationFilter, setTeamLocationFilter] = useState("all");
+  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [openTeamMenuId, setOpenTeamMenuId] = useState<string | null>(null);
+
   const users = getUsersList();
   const roles = getRolesList();
+  const teams = getTeamsList();
 
   // Get unique locations for filter (filter out empty/null values)
   const uniqueLocations = Array.from(new Set(users.map(u => u.locationPath).filter(Boolean))).sort();
@@ -100,6 +115,23 @@ function PeopleContent() {
   const filteredRoles = roles.filter(role =>
     role.name.toLowerCase().includes(roleSearchQuery.toLowerCase())
   );
+
+  // Get unique team types and locations for filters
+  const uniqueTeamTypes = Array.from(new Set(teams.map(t => t.teamType)));
+  const uniqueTeamLocations = Array.from(new Set(teams.map(t => t.locationPath).filter(Boolean))).sort();
+
+  // Filter teams
+  const filteredTeams = teams.filter(team => {
+    const matchesSearch = team.name.toLowerCase().includes(teamSearchQuery.toLowerCase()) ||
+                         (team.description && team.description.toLowerCase().includes(teamSearchQuery.toLowerCase()));
+    const matchesType = teamTypeFilter === "all" || team.teamType === teamTypeFilter;
+    const matchesStatus = teamStatusFilter === "all" || team.status === teamStatusFilter;
+    const matchesLocation = teamLocationFilter === "all" || 
+                           (teamLocationFilter === "cross-location" && !team.locationPath) ||
+                           team.locationPath === teamLocationFilter;
+    
+    return matchesSearch && matchesType && matchesStatus && matchesLocation;
+  });
 
   // Users tab handlers
   const handleAddUser = () => {
@@ -275,7 +307,46 @@ function PeopleContent() {
     }
   };
 
-  // Utility functions
+  // Teams tab handlers
+  const handleCreateTeam = (formData: CreateTeamFormData) => {
+    createTeam(formData);
+    setShowCreateTeamModal(false);
+    setEditingTeamId(null);
+  };
+
+  const handleEditTeam = (teamId: string) => {
+    setEditingTeamId(teamId);
+    setShowCreateTeamModal(true);
+    setOpenTeamMenuId(null);
+  };
+
+  const handleUpdateTeam = (formData: CreateTeamFormData) => {
+    if (editingTeamId) {
+      updateTeam(editingTeamId, formData);
+    }
+    setShowCreateTeamModal(false);
+    setEditingTeamId(null);
+  };
+
+  const handleDuplicateTeam = (teamId: string) => {
+    duplicateTeam(teamId);
+    setOpenTeamMenuId(null);
+  };
+
+  const handleDeleteTeam = (teamId: string) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+
+    if (confirm(`Are you sure you want to delete the team "${team.name}"? This action cannot be undone.`)) {
+      deleteTeam(teamId);
+      setOpenTeamMenuId(null);
+    }
+  };
+
+  const handleToggleTeamStatus = (teamId: string) => {
+    toggleTeamStatus(teamId);
+    setOpenTeamMenuId(null);
+  };
 
   // Utility functions
   const getStatusBadgeColor = (status: string) => {
@@ -365,6 +436,19 @@ function PeopleContent() {
             >
               Custom Roles
               {activeTab === 'roles' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('teams')}
+              className={`pb-4 px-1 text-sm font-medium transition-colors relative ${
+                activeTab === 'teams'
+                  ? 'text-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Teams
+              {activeTab === 'teams' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
               )}
             </button>
@@ -929,6 +1013,267 @@ function PeopleContent() {
             )}
           </>
         )}
+
+        {/* Teams Tab Content */}
+        {activeTab === 'teams' && (
+          <>
+            {/* Filters Bar */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Search */}
+                  <div className="relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search teams..."
+                      value={teamSearchQuery}
+                      onChange={(e) => setTeamSearchQuery(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Team Type Filter */}
+                  <select
+                    value={teamTypeFilter}
+                    onChange={(e) => setTeamTypeFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Types</option>
+                    {uniqueTeamTypes.map(type => (
+                      <option key={type} value={type}>{formatTeamType(type)}</option>
+                    ))}
+                  </select>
+
+                  {/* Location Filter */}
+                  <select
+                    value={teamLocationFilter}
+                    onChange={(e) => setTeamLocationFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Locations</option>
+                    <option value="cross-location">Cross-Location Teams</option>
+                    {uniqueTeamLocations.map(location => (
+                      <option key={location} value={location}>{location}</option>
+                    ))}
+                  </select>
+
+                  {/* Status Filter */}
+                  <select
+                    value={teamStatusFilter}
+                    onChange={(e) => setTeamStatusFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                {/* Add Team Button */}
+                <button
+                  onClick={() => {
+                    setEditingTeamId(null);
+                    setShowCreateTeamModal(true);
+                  }}
+                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create Team
+                </button>
+              </div>
+            </div>
+
+            {/* Teams Table */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Team Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Members
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Team Lead
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredTeams.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-gray-900 font-medium">
+                                {teamSearchQuery ? "No teams found" : "No teams yet"}
+                              </p>
+                              <p className="text-sm text-gray-500 mt-1">
+                                {teamSearchQuery ? "Try adjusting your search or filters" : "Create your first team to organize users for bulk assignments"}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTeams.map((team) => {
+                        const teamLeader = team.leaderId ? users.find(u => u.id === team.leaderId) : undefined;
+                        const memberCount = getTeamMemberCount(team);
+
+                        return (
+                          <tr key={team.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {team.name}
+                                </p>
+                                {team.description && (
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    {team.description}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                {formatTeamType(team.teamType)}
+                              </span>
+                              {team.primaryFunction && (
+                                <span className="ml-1 text-xs text-gray-500">
+                                  · {formatPrimaryFunction(team.primaryFunction)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-gray-900 font-medium">
+                                {memberCount}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-1">
+                                {memberCount === 1 ? 'member' : 'members'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {team.locationPath ? (
+                                <div className="flex items-center gap-1 text-sm text-gray-700">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="truncate max-w-xs" title={team.locationPath}>
+                                    {team.locationPath.split(' > ').pop()}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-gray-400 italic">Cross-location</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              {teamLeader ? (
+                                <span className="text-sm text-gray-900">
+                                  {teamLeader.firstName} {teamLeader.lastName}
+                                </span>
+                              ) : (
+                                <span className="text-sm text-gray-400 italic">No lead assigned</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${getStatusBadgeColor(team.status)}`}>
+                                {team.status === 'active' ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenTeamMenuId(openTeamMenuId === team.id ? null : team.id)}
+                                  data-team-id={team.id}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                >
+                                  <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                  </svg>
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {openTeamMenuId === team.id && (
+                                  <div 
+                                    className="fixed z-50 w-48 bg-white rounded-md shadow-xl border border-gray-200"
+                                    style={{
+                                      top: `${(document.querySelector(`[data-team-id="${team.id}"]`)?.getBoundingClientRect().bottom || 0) + 4}px`,
+                                      right: `${window.innerWidth - (document.querySelector(`[data-team-id="${team.id}"]`)?.getBoundingClientRect().right || 0)}px`
+                                    }}
+                                  >
+                                    <button
+                                      onClick={() => handleEditTeam(team.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDuplicateTeam(team.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                      </svg>
+                                      Duplicate
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleTeamStatus(team.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                      </svg>
+                                      {team.status === 'active' ? 'Deactivate' : 'Activate'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTeam(team.id)}
+                                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-100"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       {/* Create/Edit User Modal */}
@@ -955,6 +1300,20 @@ function PeopleContent() {
         existingRole={editingRoleId ? roles.find(r => r.id === editingRoleId) : undefined}
         checkDuplicateName={checkDuplicateName}
       />
+
+      {/* Create/Edit Team Modal */}
+      <CreateTeamModal
+        isOpen={showCreateTeamModal}
+        onClose={() => {
+          setShowCreateTeamModal(false);
+          setEditingTeamId(null);
+        }}
+        onSubmit={editingTeamId ? handleUpdateTeam : handleCreateTeam}
+        existingTeam={editingTeamId ? teams.find(t => t.id === editingTeamId) : undefined}
+        checkDuplicateName={checkDuplicateTeamName}
+        users={users}
+        locationNodes={mockLocationHierarchy}
+      />
     </div>
   );
 }
@@ -963,7 +1322,9 @@ export default function PeoplePage() {
   return (
     <RoleProvider>
       <UserProvider>
-        <PeopleContent />
+        <TeamProvider>
+          <PeopleContent />
+        </TeamProvider>
       </UserProvider>
     </RoleProvider>
   );
