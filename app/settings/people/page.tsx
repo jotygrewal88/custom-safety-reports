@@ -78,8 +78,8 @@ function PeopleContent() {
   const users = getUsersList();
   const roles = getRolesList();
 
-  // Get unique locations for filter
-  const uniqueLocations = Array.from(new Set(users.map(u => u.locationPath))).sort();
+  // Get unique locations for filter (filter out empty/null values)
+  const uniqueLocations = Array.from(new Set(users.map(u => u.locationPath).filter(Boolean))).sort();
 
   // Filter users
   const filteredUsers = users.filter(user => {
@@ -687,56 +687,71 @@ function PeopleContent() {
                                 {formatDate(role.createdAt)}
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <div className="relative inline-block">
-                                  <button
-                                    onClick={() => setOpenRoleMenuId(openRoleMenuId === role.id ? null : role.id)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                  >
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                    </svg>
-                                  </button>
+                                <button
+                                  data-role-id={role.id}
+                                  onClick={() => setOpenRoleMenuId(openRoleMenuId === role.id ? null : role.id)}
+                                  className="text-gray-400 hover:text-gray-600 inline-flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100"
+                                >
+                                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                  </svg>
+                                </button>
 
-                                  {openRoleMenuId === role.id && (
-                                    <>
-                                      <div
-                                        className="fixed inset-0 z-10"
-                                        onClick={() => setOpenRoleMenuId(null)}
-                                      />
-                                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 border border-gray-200">
+                                {openRoleMenuId === role.id && (
+                                  <>
+                                    <div
+                                      className="fixed inset-0 z-40"
+                                      onClick={() => setOpenRoleMenuId(null)}
+                                    />
+                                    <div className="fixed z-50 w-48 bg-white rounded-md shadow-xl border border-gray-200"
+                                         style={{
+                                           top: `${(document.querySelector(`[data-role-id="${role.id}"]`) as HTMLElement)?.getBoundingClientRect().bottom + 4}px`,
+                                           right: `${window.innerWidth - (document.querySelector(`[data-role-id="${role.id}"]`) as HTMLElement)?.getBoundingClientRect().right}px`
+                                         }}>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenRoleMenuId(null);
+                                          handleEditRole(role.id);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-md"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        {role.isSystemRole ? 'View' : 'Edit'}
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenRoleMenuId(null);
+                                          handleDuplicateRole(role.id);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        Duplicate
+                                      </button>
+                                      {!role.isSystemRole && (
                                         <button
-                                          onClick={() => handleEditRole(role.id)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenRoleMenuId(null);
+                                            handleDeleteRole(role.id);
+                                          }}
+                                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-200 rounded-b-md"
                                         >
                                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                           </svg>
-                                          {role.isSystemRole ? 'View' : 'Edit'}
+                                          Delete
                                         </button>
-                                        <button
-                                          onClick={() => handleDuplicateRole(role.id)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                        >
-                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                          </svg>
-                                          Duplicate
-                                        </button>
-                                        {!role.isSystemRole && (
-                                          <button
-                                            onClick={() => handleDeleteRole(role.id)}
-                                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-200"
-                                          >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            Delete
-                                          </button>
-                                        )}
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
                               </td>
                             </tr>
                           );
