@@ -11,10 +11,34 @@ export default function CAPADetailsPage() {
   const params = useParams();
   const { getCAPA } = useCAPAs();
   const [auditTrailExpanded, setAuditTrailExpanded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  
+  // Prevent hydration mismatch by only rendering after mount
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const capaId = params.id as string;
-  const capaData = getCAPA(capaId);
+  const capaData = mounted ? getCAPA(capaId) : null;
   
+  // Show loading state during SSR and initial client render
+  if (!mounted) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col ml-64">
+          <Header title="CAPA Details" />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show not found only after mounting on client
   if (!capaData) {
     return (
       <div className="flex h-screen bg-gray-50">
