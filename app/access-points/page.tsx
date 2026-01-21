@@ -20,7 +20,7 @@ function AccessPointsListContent() {
   // Filter access points
   const filteredAccessPoints = accessPoints.filter(ap => {
     const matchesSearch = ap.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         ap.location.toLowerCase().includes(searchQuery.toLowerCase());
+                         ap.location.fullPath.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || ap.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -223,7 +223,7 @@ function AccessPointsListContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      {ap.location}
+                      {ap.location.fullPath}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">
                       {ap.asset || <span className="text-gray-400">—</span>}

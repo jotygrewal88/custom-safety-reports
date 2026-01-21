@@ -7,18 +7,8 @@ import Header from "../../../src/components/Header";
 import { useCAPAs } from "../../../src/contexts/CAPAContext";
 import { mockUsers } from "../../../src/samples/mockUsers";
 import { mockLocationHierarchy } from "../../../src/samples/locationHierarchy";
-
-// Helper function to flatten location hierarchy
-function flattenLocations(nodes: any[]): any[] {
-  let result: any[] = [];
-  for (const node of nodes) {
-    result.push(node);
-    if (node.children) {
-      result = result.concat(flattenLocations(node.children));
-    }
-  }
-  return result;
-}
+import LocationHierarchySelector from "../../../src/components/LocationHierarchySelector";
+import { LocationSelection } from "../../../src/schemas/locations";
 
 export default function CreateCAPA() {
   const router = useRouter();
@@ -27,8 +17,7 @@ export default function CreateCAPA() {
     title: "",
     type: "corrective" as "corrective" | "preventive" | "both",
     eventId: "",
-    locationId: "",
-    assetId: "",
+    location: null as LocationSelection | null,
     rcaMethod: "5_whys",
     rcaFindings: "",
     rootCauseCategories: [] as string[],
@@ -43,7 +32,6 @@ export default function CreateCAPA() {
   const [isRecording, setIsRecording] = useState(false);
   const [inputMode, setInputMode] = useState<"voice" | "type">("voice");
 
-  const locations = flattenLocations(mockLocationHierarchy);
   const activeUsers = mockUsers.filter(u => u.status === "active");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,7 +39,6 @@ export default function CreateCAPA() {
     
     // Find owner name from ID
     const owner = mockUsers.find(u => u.id === formData.ownerId);
-    const location = locations.find(l => l.id === formData.locationId);
     
     if (!owner || !formData.title || !formData.rcaFindings || !formData.actionsToAddress) {
       alert("Please fill in all required fields: Title, Owner, RCA Findings, and Proposed Actions");
@@ -64,9 +51,7 @@ export default function CreateCAPA() {
       status: "open",
       priority: formData.priority,
       linkedSafetyEventId: formData.eventId || undefined,
-      locationId: formData.locationId || undefined,
-      locationName: location?.name || undefined,
-      assetId: formData.assetId || undefined,
+      location: formData.location || undefined,
       rcaMethod: formData.rcaMethod,
       rcaFindings: formData.rcaFindings,
       rootCauseCategories: formData.rootCauseCategories,
@@ -172,44 +157,20 @@ export default function CreateCAPA() {
                 </div>
               </div>
 
-              {/* Location and Asset */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location
-                  </label>
-                  <select
-                    value={formData.locationId}
-                    onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
-                  >
-                    <option value="">Select a location</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {"  ".repeat(location.level - 1)}{location.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Specific area where the CAPA will be implemented
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Asset (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.assetId}
-                    onChange={(e) => setFormData({ ...formData, assetId: e.target.value })}
-                    placeholder="Select an asset"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Specific equipment or asset related to this CAPA
-                  </p>
-                </div>
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location
+                </label>
+                <LocationHierarchySelector
+                  initialSelection={formData.location}
+                  onChange={(selection) => setFormData({ ...formData, location: selection })}
+                  locationTree={mockLocationHierarchy}
+                  required={false}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Specific area where the CAPA will be implemented
+                </p>
               </div>
 
               {/* Root Cause Analysis Section */}

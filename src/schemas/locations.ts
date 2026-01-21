@@ -13,6 +13,31 @@ export interface LocationNode {
   children?: LocationNode[];  // Recursive children
 }
 
+/**
+ * Represents a complete location selection by a user
+ * Includes the final selected node and its full hierarchical context
+ */
+export interface LocationSelection {
+  selectedLevel: number;      // 1-6, indicates which level the user selected up to
+  locationId: string;          // ID of the final selected node
+  locationName: string;        // Name of the final selected node
+  fullPath: string;            // Complete path (ex: "Global Operations > North America > United States")
+  parentIds: string[];         // Array of parent IDs for easier queries [level1, level2, ..., level(n-1)]
+}
+
+/**
+ * Internal state for tracking user selections across all 6 levels
+ * Used by LocationHierarchySelector component
+ */
+export interface LocationSelectionState {
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  level5: string | null;
+  level6: string | null;
+}
+
 // Utility function to build a full path string from a node
 export function buildLocationPath(nodeId: string, allNodes: LocationNode[]): string {
   const path: string[] = [];

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { LocationSelection } from "../schemas/locations";
 
 export interface CAPA {
   id: string;
@@ -9,9 +10,8 @@ export interface CAPA {
   status: "open" | "in-review" | "closed";
   priority: "low" | "medium" | "high";
   linkedSafetyEventId?: string;
-  locationId?: string;
-  locationName?: string;
-  assetId?: string;
+  location?: LocationSelection;
+  assetId?: string;  // Maintained for compatibility, not used in UI
   rcaMethod: string;
   rcaFindings: string;
   rootCauseCategories: string[];
@@ -44,8 +44,13 @@ const initialCAPAs: CAPA[] = [
     type: "both",
     status: "open",
     priority: "high",
-    locationId: "loc_chicago",
-    locationName: "Chicago Plant",
+    location: {
+      selectedLevel: 4,
+      locationId: "loc_chicago",
+      locationName: "Chicago Plant",
+      fullPath: "Global Operations > North America > United States > Chicago Plant",
+      parentIds: ["loc_global", "loc_na", "loc_usa"],
+    },
     rcaMethod: "5 Whys",
     rcaFindings: `1) Why did someone slip? Because there was water on the floor.
 2) Why was there water on the floor? Because the air conditioning unit leaked.
