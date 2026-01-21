@@ -13,6 +13,12 @@ export default function CAPATracker() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only rendering CAPAs after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Helper function for consistent date formatting (prevents hydration errors)
   const formatDate = (dateString: string) => {
@@ -232,12 +238,25 @@ export default function CAPATracker() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {capas.map((capa) => (
-                      <tr
-                        key={capa.id}
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => window.location.href = `/capas/${capa.id}`}
-                      >
+                    {!mounted ? (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : capas.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                          No CAPAs found. Click "Create CAPA" to add one.
+                        </td>
+                      </tr>
+                    ) : (
+                      capas.map((capa) => (
+                        <tr
+                          key={capa.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => window.location.href = `/capas/${capa.id}`}
+                        >
                         <td className="px-4 py-4">
                           <div className="flex flex-col">
                             <div className="font-medium text-gray-900">{capa.id}</div>
@@ -359,7 +378,7 @@ export default function CAPATracker() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
               </div>
