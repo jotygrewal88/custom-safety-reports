@@ -133,7 +133,10 @@ function PeopleContent() {
     
     const matchesRole = roleFilter === "all" || user.roleId === roleFilter;
     const matchesStatus = statusFilter === "all" || user.status === statusFilter;
-    const matchesLocation = !locationSelection || user.locationPath?.startsWith(locationSelection.fullPath);
+    
+    // Location filter: match if user's location is in the selected location or any of its children
+    const matchesLocation = !locationSelection || 
+      (locationSelection.childrenIds && locationSelection.childrenIds.includes(user.locationNodeId));
     
     return matchesSearch && matchesRole && matchesStatus && matchesLocation;
   });

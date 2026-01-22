@@ -5,7 +5,7 @@ import {
   LocationNode,
   LocationSelection,
   searchLocationTree,
-  buildLocationSelectionFromId,
+  buildLocationSelectionForFilter,
   getAllChildNodeIds,
 } from "../schemas/locations";
 
@@ -122,7 +122,7 @@ export default function LocationFilterDropdown({
   const handleSave = () => {
     setSelectedNodeId(tempSelectedNodeId);
     if (tempSelectedNodeId) {
-      const selection = buildLocationSelectionFromId(tempSelectedNodeId, locationTree);
+      const selection = buildLocationSelectionForFilter(tempSelectedNodeId, locationTree, includeSubLocations);
       onChange(selection);
     } else {
       onChange(null);
@@ -135,21 +135,22 @@ export default function LocationFilterDropdown({
     setIsOpen(false);
   };
 
-  // Check if a node is a parent of the temp selected node
-  const isParentOfSelected = (nodeId: string): boolean => {
-    if (!tempSelectedNodeId) return false;
-    const selection = buildLocationSelectionFromId(tempSelectedNodeId, locationTree);
-    return selection?.parentIds?.includes(nodeId) || false;
-  };
-
   const countChildren = (node: LocationNode): number => {
     return node.children ? node.children.length : 0;
+  };
+
+  // Check if a node is a child of the temp selected node
+  const isChildOfSelected = (nodeId: string): boolean => {
+    if (!tempSelectedNodeId || !includeSubLocations) return false;
+    const allChildren = getAllChildNodeIds(tempSelectedNodeId, locationTree);
+    // allChildren includes the parent node itself, so filter it out
+    return allChildren.includes(nodeId) && nodeId !== tempSelectedNodeId;
   };
 
   const renderNode = (node: LocationNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedNodes.has(node.id);
     const isSelected = tempSelectedNodeId === node.id;
-    const isParent = isParentOfSelected(node.id);
+    const isChild = isChildOfSelected(node.id);
     const hasChildren = node.children && node.children.length > 0;
     const childCount = countChildren(node);
     const paddingLeft = depth * 24;
@@ -158,7 +159,7 @@ export default function LocationFilterDropdown({
       <div key={node.id}>
         <div
           className={`flex items-center py-2 px-2 hover:bg-gray-50 rounded ${
-            isSelected ? "bg-blue-50" : isParent ? "bg-blue-50/30" : ""
+            isSelected ? "bg-blue-50" : isChild ? "bg-blue-50/40" : ""
           }`}
           style={{ paddingLeft: `${paddingLeft + 8}px` }}
         >
@@ -184,16 +185,12 @@ export default function LocationFilterDropdown({
           )}
 
           {/* Checkbox with Label */}
-          <label className="flex items-center flex-1 cursor-pointer min-w-0" onClick={(e) => {
-            if (isParent && !isSelected) {
-              e.preventDefault();
-              handleCheckboxChange(node);
-            }
-          }}>
-            {isParent && !isSelected ? (
+          <label className="flex items-center flex-1 cursor-pointer min-w-0">
+            {isChild ? (
+              // Show indeterminate-style checkbox for children when "Include sub-locations" is on
               <div className="mr-3 h-4 w-4 rounded border-2 border-blue-400 bg-blue-100 flex items-center justify-center flex-shrink-0 cursor-pointer">
-                <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 16 16" strokeWidth="3">
-                  <path d="M3 8h10" />
+                <svg className="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             ) : (
@@ -209,8 +206,8 @@ export default function LocationFilterDropdown({
               className={`text-sm truncate ${
                 isSelected 
                   ? "font-medium text-blue-700" 
-                  : isParent 
-                  ? "font-medium text-blue-600" 
+                  : isChild
+                  ? "font-medium text-blue-600"
                   : "text-gray-900"
               }`}
             >
@@ -235,7 +232,7 @@ export default function LocationFilterDropdown({
   // Get display text
   const getDisplayText = () => {
     if (!selectedNodeId) return "Select Location";
-    const selection = buildLocationSelectionFromId(selectedNodeId, locationTree);
+    const selection = buildLocationSelectionForFilter(selectedNodeId, locationTree, includeSubLocations);
     return selection?.fullPath || "Select Location";
   };
 
@@ -316,7 +313,12 @@ export default function LocationFilterDropdown({
           {/* Footer */}
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
             <span className="text-sm text-gray-600">
-              {tempSelectedNodeId ? "1 selected" : "0 selected"}
+              {tempSelectedNodeId 
+                ? includeSubLocations 
+                  ? `${getAllChildNodeIds(tempSelectedNodeId, locationTree).length} selected (with sub-locations)`
+                  : "1 selected"
+                : "0 selected"
+              }
             </span>
             <div className="flex items-center gap-2">
               <button
