@@ -18,6 +18,7 @@ interface CreateRoleModalProps {
   onSubmit: (name: string, permissions: RolePermissions) => void;
   existingRole?: CustomRole; // For edit mode
   checkDuplicateName: (name: string, excludeId?: string) => boolean;
+  initialAdvancedMode?: boolean; // Initial state for advanced mode toggle
 }
 
 export default function CreateRoleModal({ 
@@ -25,12 +26,13 @@ export default function CreateRoleModal({
   onClose, 
   onSubmit, 
   existingRole,
-  checkDuplicateName 
+  checkDuplicateName,
+  initialAdvancedMode = false
 }: CreateRoleModalProps) {
   const [roleName, setRoleName] = useState("");
   const [permissions, setPermissions] = useState<RolePermissions>(createDefaultPermissions());
   const [error, setError] = useState("");
-  const [advancedMode, setAdvancedMode] = useState(false);
+  const [advancedMode, setAdvancedMode] = useState(initialAdvancedMode);
   const [baseRoleId, setBaseRoleId] = useState("");
 
   const { getRolesList } = useRole();
@@ -50,8 +52,10 @@ export default function CreateRoleModal({
         setBaseRoleId("");
       }
       setError("");
+      // Sync with parent's advanced mode state
+      setAdvancedMode(initialAdvancedMode);
     }
-  }, [isOpen, existingRole]);
+  }, [isOpen, existingRole, initialAdvancedMode]);
   
   const handleBaseRoleChange = (roleId: string) => {
     setBaseRoleId(roleId);
@@ -280,11 +284,11 @@ export default function CreateRoleModal({
                 <p className="text-xs text-blue-800">
                   {advancedMode ? (
                     <>
-                      <span className="font-semibold">Advanced Mode:</span> All 9 EHS modules (Events, CAPA, OSHA, Access Points, LOTO, PTW, JHA, SOP, Audit)
+                      <span className="font-semibold">Advanced Mode:</span> All 9 EHS modules with individual action controls (Events, CAPA, OSHA, Access Points, LOTO, PTW, JHA, SOP, Audit)
                     </>
                   ) : (
                     <>
-                      <span className="font-semibold">Simple Mode:</span> 5 core modules (Events, CAPA, OSHA, Access Points, LOTO)
+                      <span className="font-semibold">Simple Mode:</span> 5 core modules with grouped permissions by category (View, Create & Edit, Approvals, Collaboration, Archive & Delete, Reporting)
                     </>
                   )}
                 </p>
@@ -295,6 +299,7 @@ export default function CreateRoleModal({
                 onChange={setPermissions}
                 disabled={existingRole?.isSystemRole}
                 advancedMode={advancedMode}
+                simpleMode={!advancedMode}
               />
               {existingRole?.isSystemRole && (
                 <p className="text-xs text-amber-600 mt-3 flex items-center gap-1">

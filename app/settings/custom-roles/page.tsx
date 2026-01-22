@@ -171,11 +171,11 @@ function CustomRolesContent() {
             <p className="text-sm text-blue-800">
               {advancedMode ? (
                 <>
-                  <span className="font-semibold">Advanced Mode:</span> Shows all 9 EHS modules including PTW, JHA, SOP, and Audit for comprehensive permission control.
+                  <span className="font-semibold">Advanced Mode:</span> Shows all 9 EHS modules with individual action controls including PTW, JHA, SOP, and Audit for comprehensive permission control.
                 </>
               ) : (
                 <>
-                  <span className="font-semibold">Simple Mode:</span> Shows 5 core modules (Events, CAPA, OSHA, Access Points, LOTO) for streamlined role creation.
+                  <span className="font-semibold">Simple Mode:</span> Shows 5 core modules with permissions grouped by category (View, Create & Edit, Approvals, Collaboration, etc.) for streamlined role creation.
                 </>
               )}
             </p>
@@ -357,6 +357,7 @@ function CustomRolesContent() {
         onSubmit={handleSubmitRole}
         existingRole={editingRole ? roles.find(r => r.id === editingRole) : undefined}
         checkDuplicateName={checkDuplicateName}
+        initialAdvancedMode={advancedMode}
       />
     </div>
   );
