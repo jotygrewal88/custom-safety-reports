@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import Sidebar from "../../src/components/Sidebar";
+import LocationSwitcher from "../../src/components/LocationSwitcher";
 import { AccessPointProvider, useAccessPoint } from "../../src/contexts/AccessPointContext";
 import { TemplateProvider } from "../../src/contexts/TemplateContext";
+import { useAccess } from "../../src/contexts/AccessContext";
+import { filterByLocationContext, getLocationIdFromName, isLocationFilterLocked } from "../../src/utils/accessFilters";
 import CreateAccessPointModal from "../../src/components/CreateAccessPointModal";
 import QRCodeModal from "../../src/components/QRCodeModal";
 
@@ -11,19 +15,89 @@ function AccessPointsListContent() {
   const { getAllAccessPoints, archiveAccessPoint } = useAccessPoint();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("All");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedAccessPoint, setSelectedAccessPoint] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  // Access context for RBAC filtering
+  const {
+    isOrgAdmin,
+    allowedLocationIds,
+    allowedLocations,
+    locationContext,
+    locations,
+    canCreateRecords,
+    getLocationById,
+  } = useAccess();
+
   const accessPoints = getAllAccessPoints();
 
-  // Filter access points
-  const filteredAccessPoints = accessPoints.filter(ap => {
-    const matchesSearch = ap.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         ap.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || ap.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Determine if location filter is locked (single-location user)
+  const filterLocked = isLocationFilterLocked({ isOrgAdmin, allowedLocationIds, locationContext });
+
+  // Get the "Showing" pill label
+  const getShowingLabel = () => {
+    if (locationContext === "ALL_LOCATIONS") {
+      return { text: "All locations", locked: false };
+    }
+    if (locationContext === "ALL_ASSIGNED") {
+      return { text: "All assigned locations", locked: false };
+    }
+    if (locationContext.startsWith("LOCATION:")) {
+      const locId = locationContext.replace("LOCATION:", "");
+      const loc = getLocationById(locId);
+      const isLocked = !isOrgAdmin && allowedLocationIds.length === 1;
+      return { text: loc?.name || "Unknown", locked: isLocked };
+    }
+    return { text: "Unknown", locked: false };
+  };
+
+  const showingInfo = getShowingLabel();
+
+  // Get available location options for the filter dropdown
+  const locationOptions = useMemo(() => {
+    if (isOrgAdmin) {
+      const allLocs = locations.filter(l => l.status === "active");
+      return ["All", ...allLocs.map(l => l.name)];
+    } else {
+      return ["All", ...allowedLocations.map(l => l.name)];
+    }
+  }, [isOrgAdmin, locations, allowedLocations]);
+
+  // Check if user has no location access
+  const hasNoAccess = !isOrgAdmin && allowedLocationIds.length === 0;
+
+  // Filter access points based on location context and permissions
+  const filteredAccessPoints = useMemo(() => {
+    // First apply location context filter (RBAC)
+    let filtered = filterByLocationContext(
+      accessPoints,
+      (ap) => getLocationIdFromName(ap.location),
+      { isOrgAdmin, allowedLocationIds, locationContext }
+    );
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(ap =>
+        ap.name.toLowerCase().includes(query) ||
+        ap.location.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(ap => ap.status === statusFilter);
+    }
+
+    // Apply location filter (additional filter within allowed locations)
+    if (locationFilter !== "All") {
+      filtered = filtered.filter(ap => ap.location === locationFilter);
+    }
+
+    return filtered;
+  }, [accessPoints, searchQuery, statusFilter, locationFilter, isOrgAdmin, allowedLocationIds, locationContext]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -53,6 +127,50 @@ function AccessPointsListContent() {
     setSelectedAccessPoint(id);
   };
 
+  // No access state
+  if (hasNoAccess) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar />
+        <header className="bg-white border-b border-gray-200 ml-64">
+          <div className="px-8 py-3 flex items-center justify-between">
+            <LocationSwitcher />
+            <div className="flex items-center gap-4">
+              <button className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">4</span>
+              </button>
+              <button disabled className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md text-sm font-medium cursor-not-allowed">
+                + Create
+              </button>
+              <div className="w-9 h-9 bg-gray-300 rounded-full flex items-center justify-center">
+                <span className="text-gray-700 font-medium text-sm">J</span>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="ml-64 px-8 py-6">
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">No Location Access</h2>
+            <p className="text-gray-600 mb-6 text-center max-w-md">
+              You don&apos;t have access to any locations. Contact an Org Admin to request access.
+            </p>
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+              Contact Admin
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
@@ -60,12 +178,7 @@ function AccessPointsListContent() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 ml-64">
         <div className="px-8 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-red-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm">U</span>
-            </div>
-            <span className="text-lg font-semibold">UpKeep EHS</span>
-          </div>
+          <LocationSwitcher />
           <div className="flex items-center gap-4">
             <button className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
               <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,12 +186,18 @@ function AccessPointsListContent() {
               </svg>
               <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">4</span>
             </button>
-            <button 
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              + Create
-            </button>
+            {canCreateRecords ? (
+              <button 
+                onClick={() => setShowCreateModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                + Create
+              </button>
+            ) : (
+              <button disabled className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md text-sm font-medium cursor-not-allowed">
+                + Create
+              </button>
+            )}
             <div className="w-9 h-9 bg-gray-300 rounded-full flex items-center justify-center">
               <span className="text-gray-700 font-medium text-sm">J</span>
             </div>
@@ -88,10 +207,28 @@ function AccessPointsListContent() {
       
       {/* Main Content */}
       <main className="ml-64 px-8 py-6">
-        {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Access Points</h1>
-          <p className="text-sm text-gray-600">Track and manage all access points</p>
+        {/* Page Header with Showing Pill */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Access Points</h1>
+              <p className="text-sm text-gray-600">Track and manage all access points</p>
+            </div>
+            {/* Showing Pill */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
+              showingInfo.locked 
+                ? 'bg-gray-100 text-gray-700 border border-gray-200' 
+                : 'bg-blue-50 text-blue-700 border border-blue-200'
+            }`}>
+              <span>Showing:</span>
+              <span className="font-medium">{showingInfo.text}</span>
+              {showingInfo.locked && (
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Search and Actions Row */}
@@ -152,9 +289,27 @@ function AccessPointsListContent() {
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700 font-medium">Location</span>
-            <select className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-              <option>All</option>
-            </select>
+            <div className="relative">
+              <select 
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                disabled={filterLocked}
+                className={`px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  filterLocked 
+                    ? 'cursor-not-allowed bg-gray-50 text-gray-500' 
+                    : 'hover:bg-gray-50 cursor-pointer'
+                }`}
+              >
+                {locationOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {filterLocked && (
+                <svg className="absolute right-8 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -209,7 +364,22 @@ function AccessPointsListContent() {
               {filteredAccessPoints.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
-                    No access points found
+                    <div className="flex flex-col items-center">
+                      <svg className="w-8 h-8 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                      {locationContext.startsWith("LOCATION:") ? (
+                        <>
+                          <p className="font-medium text-gray-700">No access points in {showingInfo.text}</p>
+                          <p className="text-xs text-gray-400 mt-1">Create an access point or change your location filter</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-gray-700">No access points found</p>
+                          <p className="text-xs text-gray-400 mt-1">Try adjusting your filters or create a new access point</p>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

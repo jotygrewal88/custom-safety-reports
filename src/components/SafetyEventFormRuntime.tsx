@@ -14,6 +14,8 @@ import BodyDiagramField from "./diagrams/BodyDiagramField";
 import SceneDiagramField from "./diagrams/SceneDiagramField";
 import SketchDrawingField from "./diagrams/SketchDrawingField";
 import GPSLocationField from "./GPSLocationField";
+import { useAccess } from "../contexts/AccessContext";
+import { LOCATION_ID_TO_NAME } from "../utils/accessFilters";
 
 type Errors = Record<string, string | undefined>;
 
@@ -32,7 +34,8 @@ function Field({
   error, 
   visible, 
   required,
-  onBlur
+  onBlur,
+  customOptions,
 }: {
   f: FieldDef; 
   value: FormValue; 
@@ -44,6 +47,7 @@ function Field({
   onBlur?: () => void;
   showStaticBadge?: boolean;
   aiConfidence?: number;
+  customOptions?: Array<{ value: string; label: string }>;
 }) {
   const common = (children: React.ReactNode) => (
     <div className="mb-6" style={{ display: visible ? "block" : "none" }}>
@@ -122,21 +126,32 @@ function Field({
         />
       );
     case "dropdown":
+      // Use customOptions if provided (for location field with RBAC)
+      const options = customOptions ?? (f.options ?? []).map(o => 
+        typeof o === 'string' ? { value: o, label: o } : o
+      );
       return common(
-        <select 
-          className={`${baseInputClasses} cursor-pointer`}
-          value={value ?? ""} 
-          onChange={e=>!locked && setValue(e.target.value)}
-          onBlur={onBlur}
-          disabled={locked}
-        >
-          <option value="" disabled>Select...</option>
-          {(f.options ?? []).map(o => {
-            const optVal = typeof o === 'string' ? o : o.value;
-            const optLabel = typeof o === 'string' ? o : o.label;
-            return <option key={optVal} value={optVal}>{optLabel}</option>;
-          })}
-        </select>
+        <div className="relative">
+          <select 
+            className={`${baseInputClasses} cursor-pointer ${locked ? 'pr-8' : ''}`}
+            value={value ?? ""} 
+            onChange={e=>!locked && setValue(e.target.value)}
+            onBlur={onBlur}
+            disabled={locked}
+          >
+            <option value="" disabled>Select...</option>
+            {options.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {locked && (
+            <div className="absolute right-8 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
+        </div>
       );
     case "checkbox":
     case "boolean":
@@ -330,10 +345,63 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
     ? (templateContextValue.getTemplate() || defaultTemplate)
     : defaultTemplate;
 
+  // Access context for location permissions
+  const {
+    isOrgAdmin,
+    allowedLocations,
+    allowedLocationIds,
+    locationContext,
+    canCreateRecords,
+    locations,
+    getLocationById,
+  } = useAccess();
+
+  // Location field options based on user permissions
+  const locationFieldOptions = useMemo(() => {
+    if (isOrgAdmin) {
+      // Org Admin sees all active locations
+      return locations
+        .filter(l => l.status === "active")
+        .map(l => ({ value: l.name, label: l.name }));
+    }
+    // Non-admin sees only allowed locations
+    return allowedLocations
+      .filter(l => l.status === "active")
+      .map(l => ({ value: l.name, label: l.name }));
+  }, [isOrgAdmin, locations, allowedLocations]);
+
+  // Determine if location field should be locked (single-location user)
+  const isLocationLocked = !isOrgAdmin && allowedLocationIds.length === 1;
+
+  // Get prefilled location based on context
+  const getPrefilledLocation = (): string => {
+    if (locationContext.startsWith("LOCATION:")) {
+      const locId = locationContext.replace("LOCATION:", "");
+      const loc = getLocationById(locId);
+      return loc?.name || "";
+    }
+    if (isLocationLocked && allowedLocations.length === 1) {
+      return allowedLocations[0].name;
+    }
+    return "";
+  };
+
   const staticPrefill = useMemo(()=>parseStatic().values, []);
+  const prefilledLocation = getPrefilledLocation();
   const [values, setValues] = useState<Record<string, FormValue>>({
-    title: "", dateTime: new Date().toISOString().slice(0,16), description: "", ...staticPrefill
+    title: "", 
+    dateTime: new Date().toISOString().slice(0,16), 
+    description: "", 
+    location: prefilledLocation,
+    ...staticPrefill
   });
+
+  // Update location when context changes (and user has access)
+  useEffect(() => {
+    if (prefilledLocation && !values.location) {
+      setValues(prev => ({ ...prev, location: prefilledLocation }));
+    }
+  }, [prefilledLocation]);
   const locked: Record<string, boolean> = useMemo(
     () => Object.fromEntries(Object.keys(staticPrefill).map(k => [k, true])),
     [staticPrefill]
@@ -617,6 +685,33 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
   }, [allFields, fieldVisibility]);
 
 
+  // Show access denied state for users with no location access
+  if (!canCreateRecords) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Cannot Create Safety Event</h2>
+        <p className="text-gray-600 mb-6 text-center max-w-md">
+          You don&apos;t have permission to create safety events. This could be because:
+        </p>
+        <ul className="text-gray-600 text-sm mb-6 list-disc list-inside">
+          <li>You don&apos;t have access to any locations</li>
+          <li>You have view-only access</li>
+        </ul>
+        <button 
+          onClick={() => window.history.back()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
   return (
     <>
       <h1 className="text-2xl font-bold mb-1">Report Safety Event</h1>
@@ -733,15 +828,17 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
                 
                 const isVisible1 = fieldVisibility.get(f1.id) ?? true;
                 const isRequired1 = fieldRequirements.get(f1.id) ?? false;
-                const isLocked1 = locked[f1.id] ?? false;
+                const isLocked1 = f1.id === 'location' ? (locked[f1.id] ?? isLocationLocked) : (locked[f1.id] ?? false);
                 const showStaticBadge1 = isLocked1 || ignoredSetValues.has(f1.id);
                 const confidence1 = aiConfidence[f1.id];
+                const customOpts1 = f1.id === 'location' ? locationFieldOptions : undefined;
                 
                 const isVisible2 = fieldVisibility.get(f2.id) ?? true;
                 const isRequired2 = fieldRequirements.get(f2.id) ?? false;
-                const isLocked2 = locked[f2.id] ?? false;
+                const isLocked2 = f2.id === 'location' ? (locked[f2.id] ?? isLocationLocked) : (locked[f2.id] ?? false);
                 const showStaticBadge2 = isLocked2 || ignoredSetValues.has(f2.id);
                 const confidence2 = aiConfidence[f2.id];
+                const customOpts2 = f2.id === 'location' ? locationFieldOptions : undefined;
                 
                 rendered.push(
                   <div key={`pair-${f1.id}-${f2.id}`} className="grid grid-cols-2 gap-4">
@@ -756,6 +853,7 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
                       onBlur={() => handleBlur(f1.id)}
                       showStaticBadge={showStaticBadge1}
                       aiConfidence={confidence1}
+                      customOptions={customOpts1}
                     />
                     <Field
                       f={f2}
@@ -768,6 +866,7 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
                       onBlur={() => handleBlur(f2.id)}
                       showStaticBadge={showStaticBadge2}
                       aiConfidence={confidence2}
+                      customOptions={customOpts2}
                     />
                   </div>
                 );
@@ -779,9 +878,13 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
             // Render as single column
             const isVisible = fieldVisibility.get(f.id) ?? true;
             const isRequired = fieldRequirements.get(f.id) ?? false;
-            const isLocked = locked[f.id] ?? false;
+            // Special handling for location field - use RBAC lock
+            const isLocked = f.id === 'location' ? (locked[f.id] ?? isLocationLocked) : (locked[f.id] ?? false);
             const showStaticBadge = isLocked || ignoredSetValues.has(f.id);
             const confidence = aiConfidence[f.id];
+            
+            // Use custom options for location field based on permissions
+            const customOpts = f.id === 'location' ? locationFieldOptions : undefined;
             
             rendered.push(
               <Field
@@ -796,6 +899,7 @@ export default function SafetyEventFormRuntime({ useCustomTemplate = false }: Sa
                 onBlur={() => handleBlur(f.id)}
                 showStaticBadge={showStaticBadge}
                 aiConfidence={confidence}
+                customOptions={customOpts}
               />
             );
             i++;

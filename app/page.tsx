@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import Sidebar from "../src/components/Sidebar";
+import LocationSwitcher from "../src/components/LocationSwitcher";
+import { useAccess } from "../src/contexts/AccessContext";
+import { 
+  filterByLocationContext, 
+  getLocationIdFromName,
+  isLocationFilterLocked,
+  getEmptyStateMessage,
+} from "../src/utils/accessFilters";
 
 interface DummyEvent {
   id: string;
@@ -17,7 +25,7 @@ interface DummyEvent {
 }
 
 // Dummy data for safety events
-const dummyEvents = [
+const dummyEvents: DummyEvent[] = [
   { id: "all-fields", title: "All Fields", type: "Example", status: "Open", severity: "Low", location: "Demo", dateTime: "Jan 15, 2025 2:30 PM", osha: "No", isAllFields: true },
   { id: "SE-0002", title: "Fall Incident in Staircase H", type: "Incident", status: "Open", severity: "Low", location: "Suite B", dateTime: "Jul 7, 2025 9:53 AM", osha: "No" },
   { id: "SE-0003", title: "Garbage Accumulation Near Building", type: "Observation", status: "Open", severity: "Low", location: "No location", dateTime: "Jul 7, 2025 9:54 AM", osha: "No" },
@@ -40,6 +48,105 @@ const dummyEvents = [
 
 export default function SafetyEventsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [severityFilter, setSeverityFilter] = useState("All");
+  const [locationFilter, setLocationFilter] = useState("All");
+
+  const { 
+    isOrgAdmin, 
+    allowedLocationIds, 
+    locationContext, 
+    locations,
+    allowedLocations,
+    canCreateRecords,
+    getLocationById,
+  } = useAccess();
+
+  // Determine if location filter is locked (single-location user)
+  const filterLocked = isLocationFilterLocked({ isOrgAdmin, allowedLocationIds, locationContext });
+
+  // Get the "Showing" pill label
+  const getShowingLabel = () => {
+    if (locationContext === "ALL_LOCATIONS") {
+      return { text: "All locations", locked: false };
+    }
+    if (locationContext === "ALL_ASSIGNED") {
+      return { text: "All assigned locations", locked: false };
+    }
+    if (locationContext.startsWith("LOCATION:")) {
+      const locId = locationContext.replace("LOCATION:", "");
+      const loc = getLocationById(locId);
+      const isLocked = !isOrgAdmin && allowedLocationIds.length === 1;
+      return { text: loc?.name || "Unknown", locked: isLocked };
+    }
+    return { text: "Unknown", locked: false };
+  };
+
+  const showingInfo = getShowingLabel();
+
+  // Get available location options for the filter dropdown
+  const locationOptions = useMemo(() => {
+    if (isOrgAdmin) {
+      // Org Admin sees all locations
+      const allLocs = locations.filter(l => l.status === "active");
+      return ["All", ...allLocs.map(l => l.name)];
+    } else {
+      // Non-admin sees only allowed locations
+      return ["All", ...allowedLocations.map(l => l.name)];
+    }
+  }, [isOrgAdmin, locations, allowedLocations]);
+
+  // Filter events based on location context and permissions
+  const filteredEvents = useMemo(() => {
+    // First apply location context filter
+    let events = filterByLocationContext(
+      dummyEvents,
+      (event) => getLocationIdFromName(event.location),
+      { isOrgAdmin, allowedLocationIds, locationContext }
+    );
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      events = events.filter(
+        e => e.title.toLowerCase().includes(query) || 
+             e.id.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "All") {
+      events = events.filter(e => e.status === statusFilter);
+    }
+
+    // Apply type filter
+    if (typeFilter !== "All") {
+      events = events.filter(e => e.type === typeFilter);
+    }
+
+    // Apply severity filter
+    if (severityFilter !== "All") {
+      events = events.filter(e => e.severity === severityFilter);
+    }
+
+    // Apply location filter (additional filter within allowed locations)
+    if (locationFilter !== "All") {
+      events = events.filter(e => e.location === locationFilter);
+    }
+
+    return events;
+  }, [dummyEvents, searchQuery, statusFilter, typeFilter, severityFilter, locationFilter, isOrgAdmin, allowedLocationIds, locationContext]);
+
+  // Empty state info
+  const emptyState = getEmptyStateMessage(
+    { isOrgAdmin, allowedLocationIds, locationContext },
+    locationContext,
+    locations
+  );
+
+  // Check if user has no location access
+  const hasNoAccess = !isOrgAdmin && allowedLocationIds.length === 0;
 
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
@@ -112,7 +219,10 @@ export default function SafetyEventsPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 ml-64">
         <div className="px-8 py-3 flex items-center justify-between">
-          <div></div>
+          {/* Location Switcher on the left */}
+          <div className="flex items-center gap-4">
+            <LocationSwitcher />
+          </div>
           <div className="flex items-center gap-4">
             <button className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
               <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,9 +230,15 @@ export default function SafetyEventsPage() {
               </svg>
               <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">4</span>
             </button>
-            <Link href="/safetyevents/new" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
-              + Create
-            </Link>
+            {canCreateRecords ? (
+              <Link href="/safetyevents/new" className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+                + Create
+              </Link>
+            ) : (
+              <button disabled className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md text-sm font-medium cursor-not-allowed">
+                + Create
+              </button>
+            )}
             <div className="w-9 h-9 bg-gray-300 rounded-full flex items-center justify-center">
               <span className="text-gray-700 font-medium text-sm">J</span>
             </div>
@@ -132,182 +248,266 @@ export default function SafetyEventsPage() {
       
       {/* Main Content */}
       <main className="ml-64 px-8 py-6">
-        {/* Page Header with Search and Actions */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Safety Events</h1>
-            <p className="text-sm text-gray-600">Track and manage all safety events</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        {/* No Access State */}
+        {hasNoAccess ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <input
-                type="text"
-                placeholder="Search events..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-80 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
             </div>
-            <Link 
-              href="/safetyevents/new"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <span>+ Create Safety Event</span>
-            </Link>
-            <button className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">No Location Access</h2>
+            <p className="text-gray-600 mb-6 text-center max-w-md">
+              You don&apos;t have access to any locations. Contact an Org Admin to request access.
+            </p>
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+              Contact Admin
             </button>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Page Header with Search and Actions */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 mb-1">Safety Events</h1>
+                  <p className="text-sm text-gray-600">Track and manage all safety events</p>
+                </div>
+                {/* Showing Pill */}
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
+                  showingInfo.locked 
+                    ? 'bg-gray-100 text-gray-700 border border-gray-200' 
+                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}>
+                  <span>Showing:</span>
+                  <span className="font-medium">{showingInfo.text}</span>
+                  {showingInfo.locked && (
+                    <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search events..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-80 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                {canCreateRecords ? (
+                  <Link 
+                    href="/safetyevents/new"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <span>+ Create Safety Event</span>
+                  </Link>
+                ) : (
+                  <button 
+                    disabled
+                    className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md text-sm font-medium cursor-not-allowed flex items-center gap-2"
+                  >
+                    <span>+ Create Safety Event</span>
+                  </button>
+                )}
+                <button className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <button className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-medium">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filters
-          </button>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-medium">Status</span>
-            <select className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-              <option>All</option>
-              <option>Open</option>
-              <option>In Review</option>
-              <option>Closed</option>
-            </select>
-          </div>
+            {/* Filters */}
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+              <button className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 font-medium">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                Filters
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700 font-medium">Status</span>
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option>All</option>
+                  <option>Open</option>
+                  <option>In Review</option>
+                  <option>Closed</option>
+                </select>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-medium">Type</span>
-            <select className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-              <option>All</option>
-              <option>Incident</option>
-              <option>Observation</option>
-              <option>Near Miss</option>
-              <option>Customer Incident</option>
-            </select>
-          </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700 font-medium">Type</span>
+                <select 
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option>All</option>
+                  <option>Incident</option>
+                  <option>Observation</option>
+                  <option>Near Miss</option>
+                  <option>Customer Incident</option>
+                </select>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-medium">Severity</span>
-            <select className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-              <option>All</option>
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-            </select>
-          </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700 font-medium">Severity</span>
+                <select 
+                  value={severityFilter}
+                  onChange={(e) => setSeverityFilter(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option>All</option>
+                  <option>Low</option>
+                  <option>Medium</option>
+                  <option>High</option>
+                </select>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700 font-medium">Location</span>
-            <select className="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-              <option>All</option>
-              <option>Suite B</option>
-              <option>No location</option>
-              <option>Joty&apos;s Manufacturing Plant</option>
-              <option>Willy Wonka&apos;s Chocolate Factory</option>
-              <option>UpKeep HQ</option>
-            </select>
-          </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700 font-medium">Location</span>
+                <div className="relative">
+                  <select 
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    disabled={filterLocked}
+                    className={`px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      filterLocked 
+                        ? 'cursor-not-allowed bg-gray-50 text-gray-500' 
+                        : 'hover:bg-gray-50 cursor-pointer'
+                    }`}
+                  >
+                    {locationOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {filterLocked && (
+                    <svg className="absolute right-8 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-            <span className="text-sm text-gray-700">OSHA Reportable</span>
-          </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                <span className="text-sm text-gray-700">OSHA Reportable</span>
+              </label>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
-            <span className="text-sm text-gray-700">Include Archived</span>
-          </label>
-        </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                <span className="text-sm text-gray-700">Include Archived</span>
+              </label>
+            </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Report ID & Title</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Severity</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Location</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date & Time</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">OSHA</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {dummyEvents.map((event) => (
-                <tr key={event.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = (event as DummyEvent).isAllFields ? `/safetyevents/${event.id}/all-fields` : `/safetyevents/${event.id}`}>
-                  <td className="px-4 py-3">
-                    <Link href={(event as DummyEvent).isAllFields ? `/safetyevents/${event.id}/all-fields` : `/safetyevents/${event.id}`} className="block" onClick={(e) => e.stopPropagation()}>
-                      <div className="text-sm font-medium text-gray-900">{event.id}</div>
-                      <div className="text-sm text-gray-600">{event.title}</div>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${getTypeBadgeColor(event.type)}`}>
-                      {event.type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium border ${getStatusBadgeColor(event.status)}`}>
-                      {getStatusIcon(event.status)}
-                      {event.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium border ${getSeverityBadgeColor(event.severity)}`}>
-                      {getSeverityIcon(event.severity)}
-                      {event.severity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-sm text-gray-700">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {event.location}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{event.dateTime}</td>
-                  <td className="px-4 py-3">
-                    {event.osha === "Yes" ? (
-                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    ) : (
-                      <span className="text-sm text-gray-500">No</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="relative">
-                      <button 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // TODO: Show dropdown menu
-                        }}
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1m0 6c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1m0 6c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            {/* Table or Empty State */}
+            {filteredEvents.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 py-16">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">{emptyState.title}</h3>
+                  <p className="text-sm text-gray-500 text-center max-w-md">{emptyState.message}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Report ID & Title</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Severity</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Location</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date & Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">OSHA</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredEvents.map((event) => (
+                      <tr key={event.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = (event as DummyEvent).isAllFields ? `/safetyevents/${event.id}/all-fields` : `/safetyevents/${event.id}`}>
+                        <td className="px-4 py-3">
+                          <Link href={(event as DummyEvent).isAllFields ? `/safetyevents/${event.id}/all-fields` : `/safetyevents/${event.id}`} className="block" onClick={(e) => e.stopPropagation()}>
+                            <div className="text-sm font-medium text-gray-900">{event.id}</div>
+                            <div className="text-sm text-gray-600">{event.title}</div>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${getTypeBadgeColor(event.type)}`}>
+                            {event.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium border ${getStatusBadgeColor(event.status)}`}>
+                            {getStatusIcon(event.status)}
+                            {event.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium border ${getSeverityBadgeColor(event.severity)}`}>
+                            {getSeverityIcon(event.severity)}
+                            {event.severity}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 text-sm text-gray-700">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {event.location}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{event.dateTime}</td>
+                        <td className="px-4 py-3">
+                          {event.osha === "Yes" ? (
+                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          ) : (
+                            <span className="text-sm text-gray-500">No</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="relative">
+                            <button 
+                              className="text-gray-400 hover:text-gray-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // TODO: Show dropdown menu
+                              }}
+                            >
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1m0 6c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1m0 6c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );

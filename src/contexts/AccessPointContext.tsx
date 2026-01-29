@@ -64,6 +64,28 @@ function createDefaultAccessPoints(): AccessPoint[] {
       qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-3&location=Willy%20Wonka's%20Chocolate%20Factory"
     },
     {
+      id: "access-point-suite-b-1",
+      name: "Main Entrance",
+      location: "Suite B",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-10T09:00:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-suite-b-1&location=Suite%20B"
+    },
+    {
+      id: "access-point-suite-b-2",
+      name: "Conference Room A",
+      location: "Suite B",
+      asset: undefined,
+      templateIds: ["injury-report"],
+      createdBy: "Joty Grewal",
+      createdAt: "2025-07-12T11:30:00.000Z",
+      status: "active",
+      qrCodeUrl: "/safety-events/template-form?templateId=injury-report&accessPointId=access-point-suite-b-2&location=Suite%20B"
+    },
+    {
       id: "access-point-4",
       name: "Manufacturing Plant 3",
       location: "UpKeep HQ",
@@ -163,7 +185,7 @@ export function AccessPointProvider({ children }: AccessPointProviderProps) {
             }
             return ap;
           });
-          if (migrated.length !== 10 || !migrated[0].id.startsWith('access-point-')) {
+          if (migrated.length < 10 || !migrated[0].id.startsWith('access-point-')) {
             const defaults = createDefaultAccessPoints();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
             return defaults;

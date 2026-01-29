@@ -3,10 +3,17 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAccess } from "../contexts/AccessContext";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+  
+  // Get access permissions to determine Settings visibility
+  const { isOrgAdmin, isLocationAdmin } = useAccess();
+  
+  // Show Access & Locations only for Org Admins and Location Admins
+  const canAccessSettings = isOrgAdmin || isLocationAdmin;
   
   const navItems = [
     { id: "safety-management", label: "SAFETY MANAGEMENT", items: [
@@ -14,12 +21,19 @@ export default function Sidebar() {
       { label: "Safety Events", icon: "warning", href: "/" },
       { label: "CAPAs", icon: "checklist", href: "#" },
     ]},
+    { id: "analytics", label: "ANALYTICS", items: [
+      { label: "Daily Triage", icon: "chart-bar", href: "/analytics/safety-manager" },
+      { label: "Performance", icon: "presentation", href: "/analytics/executive" },
+      { label: "CAPA Effectiveness", icon: "trending", href: "/analytics/capa-effectiveness" },
+      { label: "Operational", icon: "cog", href: "/analytics/operational" },
+    ]},
     { id: "osha", label: "OSHA", items: [
       { label: "OSHA Log (Form 300)", icon: "document", href: "#" },
       { label: "Summary (Form 300A)", icon: "calendar", href: "#" },
       { label: "Agency Reports", icon: "document", href: "#" },
     ]},
     { id: "documentation", label: "DOCUMENTATION", items: [
+      { label: "SDS Library", icon: "file-search", href: "/sds-library" },
       { label: "Job Hazard Analyses", icon: "hard-hat", href: "#" },
       { label: "Standard Operating Procedures", icon: "document", href: "#" },
       { label: "Lockout/Tagout", icon: "padlock", href: "#" },
@@ -68,6 +82,32 @@ export default function Sidebar() {
       padlock: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+      "file-search": (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+        </svg>
+      ),
+      "chart-bar": (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      "presentation": (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+        </svg>
+      ),
+      "trending": (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      ),
+      "cog": (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
     };
@@ -122,7 +162,9 @@ export default function Sidebar() {
             </h3>
             <nav className="space-y-1">
               {section.items.map((item) => {
-                const isActive = pathname === item.href || (item.href === "/" && pathname === "/");
+                const isActive = pathname === item.href || 
+                  (item.href === "/" && pathname === "/") ||
+                  (item.href !== "/" && item.href !== "#" && pathname.startsWith(item.href));
                 return (
                   <Link
                     key={item.label}
@@ -168,6 +210,21 @@ export default function Sidebar() {
                 </button>
                 {settingsExpanded && (
                   <div className="ml-6 mt-1 space-y-1">
+                    {canAccessSettings && (
+                      <Link
+                        href="/settings/access-locations"
+                        className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-md ${
+                          pathname === "/settings/access-locations" || pathname.startsWith("/settings/access-locations")
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-700 hover:bg-gray-100"
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span>Access & Locations</span>
+                      </Link>
+                    )}
                     <Link
                       href="/settings/safety-templates"
                       className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-md ${

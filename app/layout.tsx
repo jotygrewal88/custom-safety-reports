@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AccessProvider } from "../src/contexts/AccessContext";
+import DemoPersonaSwitcher from "../src/components/DemoPersonaSwitcher";
 
 export const metadata: Metadata = {
   title: "UpKeep EHS - Safety Events",
@@ -14,7 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {children}
+        <AccessProvider>
+          {children}
+          <DemoPersonaSwitcher />
+        </AccessProvider>
       </body>
     </html>
   );
