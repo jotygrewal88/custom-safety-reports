@@ -75,13 +75,18 @@ export function DistributionChart({
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius: ir, outerRadius: or, percent }: {
-    cx: number;
-    cy: number;
-    midAngle: number;
-    innerRadius: number;
-    outerRadius: number;
-    percent: number;
+    cx?: number;
+    cy?: number;
+    midAngle?: number;
+    innerRadius?: number;
+    outerRadius?: number;
+    percent?: number;
   }) => {
+    // Guard against undefined values
+    if (cx === undefined || cy === undefined || midAngle === undefined || 
+        ir === undefined || or === undefined || percent === undefined) {
+      return null;
+    }
     if (!showLabels || percent < 0.05) return null;
     
     const RADIAN = Math.PI / 180;
