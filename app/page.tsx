@@ -268,25 +268,9 @@ export default function SafetyEventsPage() {
           <>
             {/* Page Header with Search and Actions */}
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 mb-1">Safety Events</h1>
-                  <p className="text-sm text-gray-600">Track and manage all safety events</p>
-                </div>
-                {/* Showing Pill */}
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
-                  showingInfo.locked 
-                    ? 'bg-gray-100 text-gray-700 border border-gray-200' 
-                    : 'bg-blue-50 text-blue-700 border border-blue-200'
-                }`}>
-                  <span>Showing:</span>
-                  <span className="font-medium">{showingInfo.text}</span>
-                  {showingInfo.locked && (
-                    <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">Safety Events</h1>
+                <p className="text-sm text-gray-600">Track and manage all safety events</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative">

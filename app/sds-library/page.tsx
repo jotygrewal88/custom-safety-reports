@@ -538,64 +538,38 @@ export default function SDSLibraryPage() {
       
       {/* Main Content */}
       <main className="ml-64 px-8 py-6">
-        {/* Page Header with Showing Pill */}
+        {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">SDS Library</h1>
-              <p className="text-sm text-gray-600">Manage Safety Data Sheets across your locations</p>
-            </div>
-            {/* Showing Pill - Location Explorer Selection */}
-            {selectedLocationPath && selectedLocationPath.length > 0 ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm bg-blue-100 text-blue-700">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="font-medium">
-                  {selectedLocationPath.length <= 2 
-                    ? selectedLocationPath.join(" > ") 
-                    : `${selectedLocationPath[0]} > ... > ${selectedLocationPath[selectedLocationPath.length - 1]}`
-                  }
-                </span>
-                <button
-                  onClick={() => setSelectedLocationPath(null)}
-                  className="ml-1 p-0.5 hover:bg-blue-200 rounded-full transition-colors"
-                  title="Clear location filter"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
-                showingInfo.locked 
-                  ? "bg-blue-100 text-blue-700" 
-                  : "bg-gray-100 text-gray-700"
-              }`}>
-                <span>Showing: {showingInfo.text}</span>
-                {showingInfo.locked && (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                )}
-              </div>
-            )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">SDS Library</h1>
+            <p className="text-sm text-gray-600">Manage Safety Data Sheets across your locations</p>
           </div>
         </div>
 
         {/* Two Column Layout */}
         <div className="flex gap-6">
           {/* Left Column - Location Explorer (25%) */}
-          <div className="w-1/4">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="w-1/4 flex flex-col">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 flex-1">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Location Explorer</h2>
               <LocationTree
                 documents={sdsDocuments}
                 selectedPath={selectedLocationPath}
                 onSelectLocation={setSelectedLocationPath}
               />
+            </div>
+            
+            {/* PRD Documentation Link */}
+            <div className="mt-4">
+              <Link
+                href="/sdslibraryproductspecs"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Product Documentation</span>
+              </Link>
             </div>
           </div>
 

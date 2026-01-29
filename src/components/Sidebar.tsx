@@ -22,10 +22,7 @@ export default function Sidebar() {
       { label: "CAPAs", icon: "checklist", href: "#" },
     ]},
     { id: "analytics", label: "ANALYTICS", items: [
-      { label: "Daily Triage", icon: "chart-bar", href: "/analytics/safety-manager" },
-      { label: "Performance", icon: "presentation", href: "/analytics/executive" },
-      { label: "CAPA Effectiveness", icon: "trending", href: "/analytics/capa-effectiveness" },
-      { label: "Operational", icon: "cog", href: "/analytics/operational" },
+      { label: "Analytics & Reporting", icon: "chart-bar", href: "/analytics" },
     ]},
     { id: "osha", label: "OSHA", items: [
       { label: "OSHA Log (Form 300)", icon: "document", href: "#" },
@@ -33,11 +30,11 @@ export default function Sidebar() {
       { label: "Agency Reports", icon: "document", href: "#" },
     ]},
     { id: "documentation", label: "DOCUMENTATION", items: [
-      { label: "SDS Library", icon: "file-search", href: "/sds-library" },
       { label: "Job Hazard Analyses", icon: "hard-hat", href: "#" },
       { label: "Standard Operating Procedures", icon: "document", href: "#" },
       { label: "Lockout/Tagout", icon: "padlock", href: "#" },
       { label: "Permit to Work", icon: "document", href: "#" },
+      { label: "SDS Library", icon: "file-search", href: "/sds-library" },
     ]},
   ];
   
